@@ -1,0 +1,788 @@
+# -*- coding: utf-8 -*-
+# ======================================================================
+# PERCUDANI AUTHORSHIP – Catálogo UAT-VASCO (10 candidatos)
+# Resonant Hunter v9.1 – Embudo Termodinámico (γ=2.08)
+# Extracción morfológica completa: coherencia, SVR, TVI, espectro
+# ======================================================================
+!pip install -q numpy scipy gwpy matplotlib astropy
+
+import numpy as np
+from numpy.fft import rfft, irfft, rfftfreq
+from scipy.ndimage import uniform_filter1d
+import matplotlib.pyplot as plt
+from gwpy.timeseries import TimeSeries
+from astropy.coordinates import SkyCoord, EarthLocation, AltAz
+from astropy.time import Time
+import astropy.units as u
+import os, time
+
+# ----------------------------------------------------------------------
+# DOIs
+# ----------------------------------------------------------------------
+DOI_RH  = "10.5281/zenodo.18446712"
+DOI_UAT = "10.5281/zenodo.17729221"
+DOI_UPC = "10.5281/zenodo.18210808"
+
+print("="*75)
+print(f"PERCUDANI AUTHORSHIP – Catálogo UAT-VASCO (10 candidatos)")
+print(f"DOI RH: {DOI_RH} | DOI UAT: {DOI_UAT} | DOI UPC: {DOI_UPC}")
+print("="*75)
+
+# ----------------------------------------------------------------------
+# 1. Tabla de candidatos VASCO
+# ----------------------------------------------------------------------
+vasco_candidates = [
+    {"id": "VASCO-01", "ra_deg": 99.0875, "dec_deg": +2.4339},
+    {"id": "VASCO-02", "ra_deg": 296.3001, "dec_deg": -14.1758},
+    {"id": "VASCO-03", "ra_deg": 14.5621, "dec_deg": +45.8992},
+    {"id": "VASCO-04", "ra_deg": 134.1120, "dec_deg": -8.4410},
+    {"id": "VASCO-05", "ra_deg": 210.5543, "dec_deg": +33.1095},
+    {"id": "VASCO-06", "ra_deg": 55.7892, "dec_deg": -22.5034},
+    {"id": "VASCO-07", "ra_deg": 315.0045, "dec_deg": +60.1128},
+    {"id": "VASCO-08", "ra_deg": 88.3412, "dec_deg": +15.7761},
+    {"id": "VASCO-09", "ra_deg": 275.9088, "dec_deg": -5.3341},
+    {"id": "VASCO-10", "ra_deg": 102.4456, "dec_deg": +48.2010},
+]
+
+# ----------------------------------------------------------------------
+# 2. Constantes UAT / Embudo
+# ----------------------------------------------------------------------
+N_FASES = 8
+K_EARLY = 0.967
+PHASE_STEP_QUANTUM = 45.0 * K_EARLY
+R_GEOM = 0.2791
+ETA_CAUSAL = 0.781
+KAPPA_CRIT = 4.978
+OVERDRIVE = 5.140
+F_BASE = 187.37
+FS = 4096
+DURACION = 64
+SIGMA_TVI = 3.2400
+SVR_TARGET = (ETA_CAUSAL * R_GEOM / SIGMA_TVI) * 0.7071
+GAMMA_FIJO = 2.08
+HIGO_BAND = (227.5, 232.5)
+
+angulos = np.deg2rad(np.arange(N_FASES) * PHASE_STEP_QUANTUM)
+
+# ----------------------------------------------------------------------
+# 3. UAT Engine
+# ----------------------------------------------------------------------
+class UAT_Engine:
+    def __init__(self, epsilon=1e-4, k_early=0.967):
+        self.epsilon = epsilon; self.k_early = k_early
+        self.total_singularities = 0
+
+    def percudani_whiten(self, signal, fs):
+        N = len(signal)
+        spec = rfft(signal)
+        psd = np.abs(spec)**2
+        psd_smooth = uniform_filter1d(psd, size=512, mode='constant')
+        D = psd_smooth + self.epsilon * self.k_early
+        D_safe = np.where(D > 1e-30, D, 1e-30)
+        spec_white = spec / np.sqrt(D_safe)
+        out = irfft(spec_white, n=N)
+        out -= np.mean(out); std = np.std(out)
+        if std > 1e-15: out /= std
+        return out
+
+    def uat_coherence(self, x, y, fs, nperseg=8192, noverlap=4096, band=HIGO_BAND):
+        step = nperseg - noverlap
+        N = len(x)
+        n_segments = (N - nperseg) // step + 1
+        window = np.hanning(nperseg)
+        Pxx = np.zeros(nperseg//2 + 1)
+        Pyy = np.zeros(nperseg//2 + 1)
+        Pxy = np.zeros(nperseg//2 + 1, dtype=complex)
+        for i in range(n_segments):
+            start = i * step; end = start + nperseg
+            x_seg = x[start:end] * window
+            y_seg = y[start:end] * window
+            X = rfft(x_seg); Y = rfft(y_seg)
+            Pxx += np.abs(X)**2
+            Pyy += np.abs(Y)**2
+            Pxy += X * np.conj(Y)
+        Pxx /= n_segments; Pyy /= n_segments; Pxy /= n_segments
+        with np.errstate(divide='ignore', invalid='ignore'):
+            coh = np.abs(Pxy)**2 / (Pxx * Pyy)
+        f = rfftfreq(nperseg, d=1/fs)
+        mask_band = (f >= band[0]) & (f <= band[1])
+        if np.any(mask_band):
+            idx = np.where(mask_band)[0]
+            nan_mask = np.isnan(coh[idx])
+            self.total_singularities += np.sum(nan_mask)
+            coh[idx] = np.nan_to_num(coh[idx], nan=1.0)
+        return f, coh
+
+# ----------------------------------------------------------------------
+# 4. Embudo Termodinámico
+# ----------------------------------------------------------------------
+def simular_embudo_fijo(senal, n_samples, gamma=GAMMA_FIJO, ruido_base=0.01):
+    senales_frentes = []
+    for i in range(N_FASES):
+        factor_ruido = ruido_base * (1 + 0.5 * np.abs(np.sin(angulos[i])))
+        ruido_fondo = np.random.randn(n_samples) * factor_ruido
+        fase_modulada = senal * np.cos(angulos[i]) + ruido_fondo * np.sin(angulos[i])
+        senales_frentes.append(fase_modulada)
+
+    pares = np.sum(senales_frentes[::2], axis=0)
+    impares = np.sum(senales_frentes[1::2], axis=0)
+
+    ventana = 50
+    coherencia_local = np.zeros(n_samples)
+    for i in range(ventana, n_samples - ventana):
+        corr = np.corrcoef(pares[i-ventana:i+ventana], impares[i-ventana:i+ventana])[0,1]
+        coherencia_local[i] = max(0, corr)
+
+    phi = gamma * (OVERDRIVE / KAPPA_CRIT) * coherencia_local
+    return pares * np.cos(phi) + impares * np.sin(phi)
+
+def calcular_svr(senal, sigma_tvi=SIGMA_TVI):
+    rms = np.sqrt(np.mean(senal**2))
+    amp_max = np.max(np.abs(senal)) if np.max(np.abs(senal)) > 0 else 1
+    rms_norm = rms / amp_max * 0.7071
+    return rms_norm / sigma_tvi
+
+# ----------------------------------------------------------------------
+# 5. Búsqueda del mejor instante de observación
+# ----------------------------------------------------------------------
+def find_best_observation_time(ra_deg, dec_deg, detector_site, gps_o4a_start=1368960018):
+    source = SkyCoord(ra=ra_deg*u.deg, dec=dec_deg*u.deg, frame='icrs')
+    site = EarthLocation.of_site(detector_site)
+    best_alt = -999; best_gps = gps_o4a_start
+    for day_offset in range(0, 365, 1):
+        for hour in range(0, 24, 2):
+            gps_test = gps_o4a_start + day_offset*86400 + hour*3600
+            t = Time(gps_test, format='gps', scale='utc')
+            frame = AltAz(obstime=t, location=site)
+            alt = source.transform_to(frame).alt.deg
+            if alt > best_alt:
+                best_alt = alt; best_gps = gps_test
+    return int(best_gps)
+
+# ----------------------------------------------------------------------
+# 6. Descarga tolerante a fallos
+# ----------------------------------------------------------------------
+def fetch_ligo_data_robust(gps_start, duration, fs, max_attempts=5):
+    for attempt in range(max_attempts):
+        gps_try = gps_start + attempt*86400
+        try:
+            h1 = TimeSeries.fetch_open_data('H1', gps_try, gps_try+duration,
+                                            sample_rate=16384, verbose=False).resample(fs).value
+            l1 = TimeSeries.fetch_open_data('L1', gps_try, gps_try+duration,
+                                            sample_rate=16384, verbose=False).resample(fs).value
+            print(f"  Segmento GPS {gps_try} (intento {attempt+1})")
+            return h1, l1
+        except Exception:
+            print(f"  Intento {attempt+1} fallido, probando +1 día...")
+    return None, None
+
+# ----------------------------------------------------------------------
+# 7. Bucle principal – Catálogo
+# ----------------------------------------------------------------------
+engine = UAT_Engine()
+catalogo = []
+
+for cand in vasco_candidates:
+    print(f"\nProcesando {cand['id']} (RA={cand['ra_deg']:.4f}°, Dec={cand['dec_deg']:.4f}°)...")
+    gps_h1 = find_best_observation_time(cand['ra_deg'], cand['dec_deg'], 'LIGO Hanford Observatory')
+    gps_l1 = find_best_observation_time(cand['ra_deg'], cand['dec_deg'], 'LIGO Livingston Observatory')
+    gps_obs = int((gps_h1 + gps_l1)/2)
+
+    h1_raw, l1_raw = fetch_ligo_data_robust(gps_obs, DURACION, FS)
+    if h1_raw is None:
+        print(f"  [!] {cand['id']} sin datos tras 5 intentos.")
+        continue
+
+    min_len = min(len(h1_raw), len(l1_raw))
+    h1_w = engine.percudani_whiten(h1_raw[:min_len], FS)
+    l1_w = engine.percudani_whiten(l1_raw[:min_len], FS)
+
+    # Coherencia
+    f, coh = engine.uat_coherence(h1_w, l1_w, FS)
+    mask = (f >= HIGO_BAND[0]) & (f <= HIGO_BAND[1])
+    coh_max = np.max(coh[mask]) if np.any(mask) else 0.0
+    sing = engine.total_singularities
+
+    # SVR y TVI en L1
+    n_samples = len(l1_w)
+    senal_embudo = simular_embudo_fijo(l1_w, n_samples, gamma=GAMMA_FIJO)
+    svr_l1 = calcular_svr(senal_embudo)
+    tvi_l1 = (np.angle(senal_embudo)/(2*np.pi)) * K_EARLY * (1 + 0.046*(gps_obs - 1369483218)/86400.0)
+    tvi_std = np.std(tvi_l1)
+
+    # Espectro blanqueado – verificación de pico UAT
+    spec_w = np.abs(rfft(l1_w))
+    freq = rfftfreq(len(l1_w), d=1/FS)
+    idx_peak = np.argmin(np.abs(freq - F_BASE))
+    amp_peak = spec_w[idx_peak] / np.max(spec_w)
+
+    catalogo.append({
+        'id': cand['id'],
+        'ra_deg': cand['ra_deg'],
+        'dec_deg': cand['dec_deg'],
+        'gps_obs': gps_obs,
+        'coh_max': coh_max,
+        'singularities': sing,
+        'svr_l1': svr_l1,
+        'tvi_std': tvi_std,
+        'amp_187Hz': amp_peak,
+        'freq_peak': freq[idx_peak]
+    })
+
+    print(f"  Coh={coh_max:.4f} | SVR={svr_l1:.6f} | TVI_std={tvi_std:.4f} | Amp_187={amp_peak:.4f}")
+
+# ----------------------------------------------------------------------
+# 8. Resumen final
+# ----------------------------------------------------------------------
+print("\n" + "="*90)
+print("CATÁLOGO UAT-VASCO (Resonant Hunter v9.1)")
+print(f"SVR objetivo teórico: {SVR_TARGET:.6f}")
+print(f"{'ID':<12} {'RA':>8} {'Dec':>8} {'Coh_max':>9} {'SVR_L1':>9} {'TVI_std':>9} {'Amp_187':>9}")
+print("-"*90)
+for c in catalogo:
+    print(f"{c['id']:<12} {c['ra_deg']:8.3f} {c['dec_deg']:8.3f} {c['coh_max']:9.4f} {c['svr_l1']:9.6f} {c['tvi_std']:9.4f} {c['amp_187Hz']:9.4f}")
+print("="*90)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# -*- coding: utf-8 -*-
+# ======================================================================
+# PERCUDANI AUTHORSHIP – Catálogo UAT-VASCO para Virgo (V1)
+# Resonant Hunter v9.1 – Embudo Termodinámico (γ=2.08)
+# Extracción morfológica completa: SVR, TVI, coherencia V1-H1
+# ======================================================================
+!pip install -q numpy scipy gwpy matplotlib astropy
+
+import numpy as np
+from numpy.fft import rfft, irfft, rfftfreq
+from scipy.ndimage import uniform_filter1d
+import matplotlib.pyplot as plt
+from gwpy.timeseries import TimeSeries
+from astropy.coordinates import SkyCoord, EarthLocation, AltAz
+from astropy.time import Time
+import astropy.units as u
+import time
+
+# ----------------------------------------------------------------------
+# DOIs
+# ----------------------------------------------------------------------
+DOI_RH  = "10.5281/zenodo.18446712"
+DOI_UAT = "10.5281/zenodo.17729221"
+DOI_UPC = "10.5281/zenodo.18210808"
+
+print("="*75)
+print(f"PERCUDANI AUTHORSHIP – Catálogo UAT-VASCO para Virgo (V1)")
+print(f"DOI RH: {DOI_RH} | DOI UAT: {DOI_UAT} | DOI UPC: {DOI_UPC}")
+print("="*75)
+
+# ----------------------------------------------------------------------
+# 1. Tabla de candidatos VASCO
+# ----------------------------------------------------------------------
+vasco_candidates = [
+    {"id": "VASCO-01", "ra_deg": 99.0875, "dec_deg": +2.4339},
+    {"id": "VASCO-02", "ra_deg": 296.3001, "dec_deg": -14.1758},
+    {"id": "VASCO-03", "ra_deg": 14.5621, "dec_deg": +45.8992},
+    {"id": "VASCO-04", "ra_deg": 134.1120, "dec_deg": -8.4410},
+    {"id": "VASCO-05", "ra_deg": 210.5543, "dec_deg": +33.1095},
+    {"id": "VASCO-06", "ra_deg": 55.7892, "dec_deg": -22.5034},
+    {"id": "VASCO-07", "ra_deg": 315.0045, "dec_deg": +60.1128},
+    {"id": "VASCO-08", "ra_deg": 88.3412, "dec_deg": +15.7761},
+    {"id": "VASCO-09", "ra_deg": 275.9088, "dec_deg": -5.3341},
+    {"id": "VASCO-10", "ra_deg": 102.4456, "dec_deg": +48.2010},
+]
+
+# ----------------------------------------------------------------------
+# 2. Constantes UAT / Embudo
+# ----------------------------------------------------------------------
+N_FASES = 8
+K_EARLY = 0.967
+PHASE_STEP_QUANTUM = 45.0 * K_EARLY       # 43.515°
+R_GEOM = 0.2791
+ETA_CAUSAL = 0.781
+KAPPA_CRIT = 4.978
+OVERDRIVE = 5.140
+F_BASE = 187.37
+FS = 4096
+DURACION = 64
+SIGMA_TVI = 3.2400
+SVR_TARGET = (ETA_CAUSAL * R_GEOM / SIGMA_TVI) * 0.7071
+GAMMA_FIJO = 2.08
+HIGO_BAND = (227.5, 232.5)
+
+angulos = np.deg2rad(np.arange(N_FASES) * PHASE_STEP_QUANTUM)
+
+# ----------------------------------------------------------------------
+# 3. UAT Engine
+# ----------------------------------------------------------------------
+class UAT_Engine:
+    def __init__(self, epsilon=1e-4, k_early=0.967):
+        self.epsilon = epsilon; self.k_early = k_early
+        self.total_singularities = 0
+
+    def percudani_whiten(self, signal, fs):
+        N = len(signal)
+        spec = rfft(signal)
+        psd = np.abs(spec)**2
+        psd_smooth = uniform_filter1d(psd, size=512, mode='constant')
+        D = psd_smooth + self.epsilon * self.k_early
+        D_safe = np.where(D > 1e-30, D, 1e-30)
+        spec_white = spec / np.sqrt(D_safe)
+        out = irfft(spec_white, n=N)
+        out -= np.mean(out); std = np.std(out)
+        if std > 1e-15: out /= std
+        return out
+
+    def uat_coherence(self, x, y, fs, nperseg=8192, noverlap=4096, band=HIGO_BAND):
+        step = nperseg - noverlap
+        N = len(x)
+        n_segments = (N - nperseg) // step + 1
+        window = np.hanning(nperseg)
+        Pxx = np.zeros(nperseg//2 + 1)
+        Pyy = np.zeros(nperseg//2 + 1)
+        Pxy = np.zeros(nperseg//2 + 1, dtype=complex)
+        for i in range(n_segments):
+            start = i * step; end = start + nperseg
+            x_seg = x[start:end] * window
+            y_seg = y[start:end] * window
+            X = rfft(x_seg); Y = rfft(y_seg)
+            Pxx += np.abs(X)**2
+            Pyy += np.abs(Y)**2
+            Pxy += X * np.conj(Y)
+        Pxx /= n_segments; Pyy /= n_segments; Pxy /= n_segments
+        with np.errstate(divide='ignore', invalid='ignore'):
+            coh = np.abs(Pxy)**2 / (Pxx * Pyy)
+        f = rfftfreq(nperseg, d=1/fs)
+        mask_band = (f >= band[0]) & (f <= band[1])
+        if np.any(mask_band):
+            idx = np.where(mask_band)[0]
+            nan_mask = np.isnan(coh[idx])
+            self.total_singularities += np.sum(nan_mask)
+            coh[idx] = np.nan_to_num(coh[idx], nan=1.0)
+        return f, coh
+
+# ----------------------------------------------------------------------
+# 4. Embudo Termodinámico
+# ----------------------------------------------------------------------
+def simular_embudo_fijo(senal, n_samples, gamma=GAMMA_FIJO, ruido_base=0.01):
+    senales_frentes = []
+    for i in range(N_FASES):
+        factor_ruido = ruido_base * (1 + 0.5 * np.abs(np.sin(angulos[i])))
+        ruido_fondo = np.random.randn(n_samples) * factor_ruido
+        fase_modulada = senal * np.cos(angulos[i]) + ruido_fondo * np.sin(angulos[i])
+        senales_frentes.append(fase_modulada)
+
+    pares = np.sum(senales_frentes[::2], axis=0)
+    impares = np.sum(senales_frentes[1::2], axis=0)
+
+    ventana = 50
+    coherencia_local = np.zeros(n_samples)
+    for i in range(ventana, n_samples - ventana):
+        corr = np.corrcoef(pares[i-ventana:i+ventana], impares[i-ventana:i+ventana])[0,1]
+        coherencia_local[i] = max(0, corr)
+
+    phi = gamma * (OVERDRIVE / KAPPA_CRIT) * coherencia_local
+    return pares * np.cos(phi) + impares * np.sin(phi)
+
+def calcular_svr(senal, sigma_tvi=SIGMA_TVI):
+    rms = np.sqrt(np.mean(senal**2))
+    amp_max = np.max(np.abs(senal)) if np.max(np.abs(senal)) > 0 else 1
+    rms_norm = rms / amp_max * 0.7071
+    return rms_norm / sigma_tvi
+
+# ----------------------------------------------------------------------
+# 5. Búsqueda del mejor instante de observación (Virgo)
+# ----------------------------------------------------------------------
+def find_best_observation_time_v1(ra_deg, dec_deg, gps_o4a_start=1368960018):
+    source = SkyCoord(ra=ra_deg*u.deg, dec=dec_deg*u.deg, frame='icrs')
+    site = EarthLocation.of_site('Virgo')
+    best_alt = -999; best_gps = gps_o4a_start
+    for day_offset in range(0, 365, 1):
+        for hour in range(0, 24, 2):
+            gps_test = gps_o4a_start + day_offset*86400 + hour*3600
+            t = Time(gps_test, format='gps', scale='utc')
+            frame = AltAz(obstime=t, location=site)
+            alt = source.transform_to(frame).alt.deg
+            if alt > best_alt:
+                best_alt = alt; best_gps = gps_test
+    return int(best_gps)
+
+# ----------------------------------------------------------------------
+# 6. Descarga tolerante a fallos (V1 y H1)
+# ----------------------------------------------------------------------
+def fetch_v1_h1_robust(gps_start, duration, fs, max_attempts=5):
+    for attempt in range(max_attempts):
+        gps_try = gps_start + attempt*86400
+        try:
+            v1 = TimeSeries.fetch_open_data('V1', gps_try, gps_try+duration,
+                                            sample_rate=16384, verbose=False).resample(fs).value
+            # Intentamos también H1 para coherencia cruzada (si falla, seguimos con V1 solo)
+            h1 = None
+            try:
+                h1 = TimeSeries.fetch_open_data('H1', gps_try, gps_try+duration,
+                                                sample_rate=16384, verbose=False).resample(fs).value
+            except:
+                pass
+            print(f"  Segmento V1 en GPS {gps_try} (intento {attempt+1})" + (", H1 disponible" if h1 is not None else ", H1 no disponible"))
+            return v1, h1
+        except Exception:
+            print(f"  Intento {attempt+1} fallido, probando +1 día...")
+    return None, None
+
+# ----------------------------------------------------------------------
+# 7. Bucle principal – Catálogo V1
+# ----------------------------------------------------------------------
+engine = UAT_Engine()
+catalogo_v1 = []
+
+for cand in vasco_candidates:
+    print(f"\nProcesando {cand['id']} (RA={cand['ra_deg']:.4f}°, Dec={cand['dec_deg']:.4f}°)...")
+    gps_v1 = find_best_observation_time_v1(cand['ra_deg'], cand['dec_deg'])
+
+    v1_raw, h1_raw = fetch_v1_h1_robust(gps_v1, DURACION, FS)
+    if v1_raw is None:
+        print(f"  [!] {cand['id']} sin datos V1 tras 5 intentos.")
+        continue
+
+    # Blanqueamiento V1
+    v1_w = engine.percudani_whiten(v1_raw, FS)
+
+    # Coherencia V1-H1 (si H1 disponible)
+    coh_max = np.nan
+    sing = 0
+    if h1_raw is not None:
+        min_len = min(len(v1_raw), len(h1_raw))
+        h1_w = engine.percudani_whiten(h1_raw[:min_len], FS)
+        v1_w_coh = engine.percudani_whiten(v1_raw[:min_len], FS)
+        f, coh = engine.uat_coherence(h1_w, v1_w_coh, FS)
+        mask = (f >= HIGO_BAND[0]) & (f <= HIGO_BAND[1])
+        coh_max = np.max(coh[mask]) if np.any(mask) else 0.0
+        sing = engine.total_singularities
+    else:
+        # Sin H1, calculamos solo SVR y TVI sobre V1
+        pass
+
+    # SVR y TVI en V1
+    n_samples = len(v1_w)
+    senal_embudo = simular_embudo_fijo(v1_w, n_samples, gamma=GAMMA_FIJO)
+    svr_v1 = calcular_svr(senal_embudo)
+    tvi_v1 = (np.angle(senal_embudo)/(2*np.pi)) * K_EARLY * (1 + 0.046*(gps_v1 - 1369483218)/86400.0)
+    tvi_std = np.std(tvi_v1)
+
+    # Espectro blanqueado – verificación de pico UAT
+    spec_w = np.abs(rfft(v1_w))
+    freq = rfftfreq(len(v1_w), d=1/FS)
+    idx_peak = np.argmin(np.abs(freq - F_BASE))
+    amp_peak = spec_w[idx_peak] / np.max(spec_w)
+
+    catalogo_v1.append({
+        'id': cand['id'],
+        'ra_deg': cand['ra_deg'],
+        'dec_deg': cand['dec_deg'],
+        'gps_obs': gps_v1,
+        'coh_max': coh_max if not np.isnan(coh_max) else None,
+        'svr_v1': svr_v1,
+        'tvi_std': tvi_std,
+        'amp_187Hz': amp_peak
+    })
+
+    coh_str = f"{coh_max:.4f}" if coh_max is not None and not np.isnan(coh_max) else "N/A"
+    print(f"  Coh(V1-H1)={coh_str} | SVR={svr_v1:.6f} | TVI_std={tvi_std:.4f} | Amp_187={amp_peak:.4f}")
+
+# ----------------------------------------------------------------------
+# 8. Resumen final
+# ----------------------------------------------------------------------
+print("\n" + "="*90)
+print("CATÁLOGO UAT-VASCO para Virgo (V1)")
+print(f"SVR objetivo teórico: {SVR_TARGET:.6f}")
+print(f"{'ID':<12} {'RA':>8} {'Dec':>8} {'Coh(V1-H1)':>12} {'SVR_V1':>9} {'TVI_std':>9} {'Amp_187':>9}")
+print("-"*90)
+for c in catalogo_v1:
+    coh_str = f"{c['coh_max']:.4f}" if c['coh_max'] is not None else "N/A"
+    print(f"{c['id']:<12} {c['ra_deg']:8.3f} {c['dec_deg']:8.3f} {coh_str:>12} {c['svr_v1']:9.6f} {c['tvi_std']:9.4f} {c['amp_187Hz']:9.4f}")
+print("="*90)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# -*- coding: utf-8 -*-
+# ======================================================================
+# PERCUDANI AUTHORSHIP – Catálogo UAT-VASCO para Virgo (V1) - FASE O4b
+# Resonant Hunter v9.1 – Embudo Termodinámico (γ=2.08)
+# Triangulación de Filtro 4D (L1-V1)
+# ======================================================================
+!pip install -q numpy scipy gwpy matplotlib astropy
+
+import numpy as np
+from numpy.fft import rfft, irfft, rfftfreq
+from scipy.ndimage import uniform_filter1d
+import matplotlib.pyplot as plt
+from gwpy.timeseries import TimeSeries
+from astropy.coordinates import SkyCoord, EarthLocation, AltAz
+from astropy.time import Time
+import astropy.units as u
+import time
+
+# ----------------------------------------------------------------------
+# DOIs y Autoría
+# ----------------------------------------------------------------------
+DOI_RH  = "10.5281/zenodo.18446712"
+DOI_UAT = "10.5281/zenodo.17729221"
+DOI_UPC = "10.5281/zenodo.18210808"
+
+print("="*75)
+print(f"PERCUDANI AUTHORSHIP – Catálogo UAT-VASCO para Virgo (V1) - FASE O4b")
+print(f"DOI RH: {DOI_RH} | DOI UAT: {DOI_UAT} | DOI UPC: {DOI_UPC}")
+print("="*75)
+
+# ----------------------------------------------------------------------
+# 1. Tabla de candidatos VASCO
+# ----------------------------------------------------------------------
+vasco_candidates = [
+    {"id": "VASCO-01", "ra_deg": 99.0875, "dec_deg": +2.4339},
+    {"id": "VASCO-02", "ra_deg": 296.3001, "dec_deg": -14.1758},
+    {"id": "VASCO-03", "ra_deg": 14.5621, "dec_deg": +45.8992},
+    {"id": "VASCO-04", "ra_deg": 134.1120, "dec_deg": -8.4410},
+    {"id": "VASCO-05", "ra_deg": 210.5543, "dec_deg": +33.1095},
+    {"id": "VASCO-06", "ra_deg": 55.7892, "dec_deg": -22.5034},
+    {"id": "VASCO-07", "ra_deg": 315.0045, "dec_deg": +60.1128},
+    {"id": "VASCO-08", "ra_deg": 88.3412, "dec_deg": +15.7761},
+    {"id": "VASCO-09", "ra_deg": 275.9088, "dec_deg": -5.3341},
+    {"id": "VASCO-10", "ra_deg": 102.4456, "dec_deg": +48.2010},
+]
+
+# ----------------------------------------------------------------------
+# 2. Constantes UAT / Embudo
+# ----------------------------------------------------------------------
+N_FASES = 8
+K_EARLY = 0.967
+PHASE_STEP_QUANTUM = 45.0 * K_EARLY       # 43.515°
+R_GEOM = 0.2791
+ETA_CAUSAL = 0.781
+KAPPA_CRIT = 4.978
+OVERDRIVE = 5.140
+F_BASE = 187.37
+FS = 4096
+DURACION = 64
+SIGMA_TVI = 3.2400
+SVR_TARGET = (ETA_CAUSAL * R_GEOM / SIGMA_TVI) * 0.7071
+GAMMA_FIJO = 2.08
+HIGO_BAND = (227.5, 232.5)
+
+# GPS de inicio para la fase O4b (Abril 2024 - Activación de Virgo)
+GPS_O4B_START = 1396417050 
+
+angulos = np.deg2rad(np.arange(N_FASES) * PHASE_STEP_QUANTUM)
+
+# ----------------------------------------------------------------------
+# 3. UAT Engine
+# ----------------------------------------------------------------------
+class UAT_Engine:
+    def __init__(self, epsilon=1e-4, k_early=0.967):
+        self.epsilon = epsilon; self.k_early = k_early
+        self.total_singularities = 0
+
+    def percudani_whiten(self, signal, fs):
+        N = len(signal)
+        spec = rfft(signal)
+        psd = np.abs(spec)**2
+        psd_smooth = uniform_filter1d(psd, size=512, mode='constant')
+        D = psd_smooth + self.epsilon * self.k_early
+        D_safe = np.where(D > 1e-30, D, 1e-30)
+        spec_white = spec / np.sqrt(D_safe)
+        out = irfft(spec_white, n=N)
+        out -= np.mean(out); std = np.std(out)
+        if std > 1e-15: out /= std
+        return out
+
+    def uat_coherence(self, x, y, fs, nperseg=8192, noverlap=4096, band=HIGO_BAND):
+        step = nperseg - noverlap
+        N = len(x)
+        n_segments = (N - nperseg) // step + 1
+        window = np.hanning(nperseg)
+        Pxx = np.zeros(nperseg//2 + 1)
+        Pyy = np.zeros(nperseg//2 + 1)
+        Pxy = np.zeros(nperseg//2 + 1, dtype=complex)
+        for i in range(n_segments):
+            start = i * step; end = start + nperseg
+            x_seg = x[start:end] * window
+            y_seg = y[start:end] * window
+            X = rfft(x_seg); Y = rfft(y_seg)
+            Pxx += np.abs(X)**2
+            Pyy += np.abs(Y)**2
+            Pxy += X * np.conj(Y)
+        Pxx /= n_segments; Pyy /= n_segments; Pxy /= n_segments
+        with np.errstate(divide='ignore', invalid='ignore'):
+            coh = np.abs(Pxy)**2 / (Pxx * Pyy)
+        f = rfftfreq(nperseg, d=1/fs)
+        mask_band = (f >= band[0]) & (f <= band[1])
+        if np.any(mask_band):
+            idx = np.where(mask_band)[0]
+            nan_mask = np.isnan(coh[idx])
+            self.total_singularities += np.sum(nan_mask)
+            coh[idx] = np.nan_to_num(coh[idx], nan=1.0)
+        return f, coh
+
+# ----------------------------------------------------------------------
+# 4. Embudo Termodinámico
+# ----------------------------------------------------------------------
+def simular_embudo_fijo(senal, n_samples, gamma=GAMMA_FIJO, ruido_base=0.01):
+    senales_frentes = []
+    for i in range(N_FASES):
+        factor_ruido = ruido_base * (1 + 0.5 * np.abs(np.sin(angulos[i])))
+        ruido_fondo = np.random.randn(n_samples) * factor_ruido
+        fase_modulada = senal * np.cos(angulos[i]) + ruido_fondo * np.sin(angulos[i])
+        senales_frentes.append(fase_modulada)
+
+    pares = np.sum(senales_frentes[::2], axis=0)
+    impares = np.sum(senales_frentes[1::2], axis=0)
+
+    ventana = 50
+    coherencia_local = np.zeros(n_samples)
+    for i in range(ventana, n_samples - ventana):
+        corr = np.corrcoef(pares[i-ventana:i+ventana], impares[i-ventana:i+ventana])[0,1]
+        coherencia_local[i] = max(0, corr)
+
+    phi = gamma * (OVERDRIVE / KAPPA_CRIT) * coherencia_local
+    return pares * np.cos(phi) + impares * np.sin(phi)
+
+def calcular_svr(senal, sigma_tvi=SIGMA_TVI):
+    rms = np.sqrt(np.mean(senal**2))
+    amp_max = np.max(np.abs(senal)) if np.max(np.abs(senal)) > 0 else 1
+    rms_norm = rms / amp_max * 0.7071
+    return rms_norm / sigma_tvi
+
+# ----------------------------------------------------------------------
+# 5. Búsqueda del mejor instante de observación en O4b (Virgo)
+# ----------------------------------------------------------------------
+def find_best_observation_time_v1(ra_deg, dec_deg, gps_start=GPS_O4B_START):
+    source = SkyCoord(ra=ra_deg*u.deg, dec=dec_deg*u.deg, frame='icrs')
+    site = EarthLocation.of_site('Virgo')
+    best_alt = -999; best_gps = gps_start
+    # Escaneamos 120 días dentro de O4b
+    for day_offset in range(0, 120, 1):
+        for hour in range(0, 24, 2):
+            gps_test = gps_start + day_offset*86400 + hour*3600
+            t = Time(gps_test, format='gps', scale='utc')
+            frame = AltAz(obstime=t, location=site)
+            alt = source.transform_to(frame).alt.deg
+            if alt > best_alt:
+                best_alt = alt; best_gps = gps_test
+    return int(best_gps)
+
+# ----------------------------------------------------------------------
+# 6. Descarga tolerante a fallos (V1 y L1 para validación)
+# ----------------------------------------------------------------------
+def fetch_v1_l1_robust(gps_start, duration, fs, max_attempts=5):
+    for attempt in range(max_attempts):
+        gps_try = gps_start + attempt*86400
+        try:
+            v1 = TimeSeries.fetch_open_data('V1', gps_try, gps_try+duration,
+                                            sample_rate=16384, verbose=False).resample(fs).value
+            # Intentamos cruzar con L1 en la misma ventana temporal de O4b
+            l1 = None
+            try:
+                l1 = TimeSeries.fetch_open_data('L1', gps_try, gps_try+duration,
+                                                sample_rate=16384, verbose=False).resample(fs).value
+            except:
+                pass
+            print(f"  Segmento V1 en GPS {gps_try} (intento {attempt+1})" + (", L1 disponible" if l1 is not None else ", L1 no disponible"))
+            return v1, l1
+        except Exception:
+            print(f"  Intento {attempt+1} fallido, probando +1 día...")
+    return None, None
+
+# ----------------------------------------------------------------------
+# 7. Bucle principal – Catálogo V1 (O4b)
+# ----------------------------------------------------------------------
+engine = UAT_Engine()
+catalogo_v1 = []
+
+for cand in vasco_candidates:
+    print(f"\nProcesando {cand['id']} (RA={cand['ra_deg']:.4f}°, Dec={cand['dec_deg']:.4f}°)...")
+    gps_v1 = find_best_observation_time_v1(cand['ra_deg'], cand['dec_deg'])
+
+    v1_raw, l1_raw = fetch_v1_l1_robust(gps_v1, DURACION, FS)
+    if v1_raw is None:
+        print(f"  [!] {cand['id']} sin datos V1 tras 5 intentos en O4b.")
+        continue
+
+    # Blanqueamiento V1
+    v1_w = engine.percudani_whiten(v1_raw, FS)
+
+    # Coherencia V1-L1 (si L1 disponible para esa fecha)
+    coh_max = np.nan
+    sing = 0
+    if l1_raw is not None:
+        min_len = min(len(v1_raw), len(l1_raw))
+        l1_w = engine.percudani_whiten(l1_raw[:min_len], FS)
+        v1_w_coh = engine.percudani_whiten(v1_raw[:min_len], FS)
+        f, coh = engine.uat_coherence(l1_w, v1_w_coh, FS)
+        mask = (f >= HIGO_BAND[0]) & (f <= HIGO_BAND[1])
+        coh_max = np.max(coh[mask]) if np.any(mask) else 0.0
+        sing = engine.total_singularities
+
+    # SVR y TVI en V1
+    n_samples = len(v1_w)
+    senal_embudo = simular_embudo_fijo(v1_w, n_samples, gamma=GAMMA_FIJO)
+    svr_v1 = calcular_svr(senal_embudo)
+    
+    # La deriva temporal sigue anclada al inicio de O4a para mantener la continuidad de fase del modelo
+    tvi_v1 = (np.angle(senal_embudo)/(2*np.pi)) * K_EARLY * (1 + 0.046*(gps_v1 - 1369483218)/86400.0)
+    tvi_std = np.std(tvi_v1)
+
+    # Espectro blanqueado – verificación de pico UAT
+    spec_w = np.abs(rfft(v1_w))
+    freq = rfftfreq(len(v1_w), d=1/FS)
+    idx_peak = np.argmin(np.abs(freq - F_BASE))
+    amp_peak = spec_w[idx_peak] / np.max(spec_w)
+
+    catalogo_v1.append({
+        'id': cand['id'],
+        'ra_deg': cand['ra_deg'],
+        'dec_deg': cand['dec_deg'],
+        'gps_obs': gps_v1,
+        'coh_max': coh_max if not np.isnan(coh_max) else None,
+        'svr_v1': svr_v1,
+        'tvi_std': tvi_std,
+        'amp_187Hz': amp_peak
+    })
+
+    coh_str = f"{coh_max:.4f}" if coh_max is not None and not np.isnan(coh_max) else "N/A"
+    print(f"  Coh(V1-L1)={coh_str} | SVR={svr_v1:.6f} | TVI_std={tvi_std:.4f} | Amp_187={amp_peak:.4f}")
+
+# ----------------------------------------------------------------------
+# 8. Resumen final
+# ----------------------------------------------------------------------
+print("\n" + "="*90)
+print("CATÁLOGO UAT-VASCO para Virgo (V1) - O4b")
+print(f"SVR objetivo teórico: {SVR_TARGET:.6f}")
+print(f"{'ID':<12} {'RA':>8} {'Dec':>8} {'Coh(V1-L1)':>12} {'SVR_V1':>9} {'TVI_std':>9} {'Amp_187':>9}")
+print("-"*90)
+for c in catalogo_v1:
+    coh_str = f"{c['coh_max']:.4f}" if c['coh_max'] is not None else "N/A"
+    print(f"{c['id']:<12} {c['ra_deg']:8.3f} {c['dec_deg']:8.3f} {coh_str:>12} {c['svr_v1']:9.6f} {c['tvi_std']:9.4f} {c['amp_187Hz']:9.4f}")
+print("="*90)

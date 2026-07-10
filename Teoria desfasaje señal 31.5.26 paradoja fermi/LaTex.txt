@@ -1,0 +1,100 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{hyperref}
+
+\title{\textbf{The Gravitational Phase Filter: \\ A Speculative Resolution to the Fermi Paradox via Temporal Desynchronization}}
+\author{Miguel Ángel Percudani\\
+\texttt{miguel\_percudani@yahoo.com.ar}\\
+Puan, Buenos Aires, Argentina}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+The Fermi paradox —the apparent contradiction between the high probability of extraterrestrial civilizations and the lack of detectable signals— remains a central puzzle of modern astrobiology. We propose a speculative mechanism, termed the \textit{Gravitational Phase Filter}, in which the cumulative temporal desynchronization induced by gravitational fields and a possible quantum phase jitter (motivated by the Unified Applicable Time, UAT, and the Unified Causal Principle, UCP) degrades weak, information-rich artificial signals into noise, while leaving powerful natural beacons (e.g., pulsars) detectable. We present a simple numerical simulation that illustrates this effect: a weak binary-phase modulated signal becomes unrecognizable under increasing jitter, whereas a strong periodic pulse train remains identifiable. The work is purely exploratory and is intended as a conceptual contribution to the debate on interstellar communication and the limits of signal coherence in a causally regulated universe.
+\end{abstract}
+
+\section{Introduction}
+The search for extraterrestrial intelligence (SETI) has spanned decades without a confirmed detection. While many resolutions to the Fermi paradox have been proposed —ranging from the rarity of life to self-destruction or deliberate non-communication— few have addressed the fundamental physical limits on signal propagation imposed by the structure of spacetime itself.
+
+General relativity dictates that time flows at different rates in different gravitational potentials. A signal traveling from a distant exoplanet to Earth must traverse a complex landscape of stellar, galactic, and possibly intergalactic gravitational fields. Each of these regions imprints a small temporal shift on the waveform. Although these shifts are deterministic in principle, the combined effect on a weak, modulated signal may accumulate to the point where the original information is irrecoverably lost.
+
+The Unified Applicable Time (UAT) framework~\cite{UAT} and its corollary, the Unified Causal Principle (UCP)~\cite{UCP}, introduce a deeper layer: a fundamental quantum jitter, or phase noise, that arises from the need to maintain causal coherence at the Planck scale. In this picture, the jitter is not a simple deterministic distortion but a stochastic process that scales inversely with the amplitude of the signal. Strong, repetitive signals —like those from pulsars— can overcome this noise, while weak, complex signals —like those of an artificial transmitter— are gradually erased.
+
+This paper presents a simple numerical model of such a \textit{Gravitational Phase Filter} and discusses its implications for the Fermi paradox. The work is speculative and exploratory; no claim of physical discovery is made.
+
+\section{The Gravitational Phase Filter Hypothesis}
+\subsection{Temporal Desynchronization in General Relativity}
+Consider a signal emitted by a distant civilization. The spacetime metric along the line of sight is not flat: it is curved by stars, gas clouds, dark matter halos, and the supermassive black hole at the center of the host galaxy. The proper time interval between two successive wave crests depends on the gravitational potential \(\Phi\) along the path:
+\begin{equation}
+\Delta\tau = \Delta t \sqrt{1 + \frac{2\Phi}{c^2}}.
+\end{equation}
+Although the total time delay can be computed given a precise mass distribution, the cumulative effect on a finely modulated signal (e.g., a binary phase-shift keying, BPSK, transmission) is a scrambling of the phase. For powerful, strictly periodic sources such as pulsars, this desynchronization is merely a small, correctable dispersion. For a weak, information-carrying signal, the same effect can render the modulation pattern indistinguishable from background noise.
+
+\subsection{Quantum Phase Jitter from UAT/UCP}
+The UAT framework suggests that the early universe underwent a ``quantum braking'' phase governed by the parameter \(k_{\text{early}} \approx 0.967\)~\cite{UAT}. A corollary of this framework is that the vacuum itself imposes a stochastic phase jitter on propagating signals, with an amplitude inversely proportional to the signal's instantaneous amplitude. This can be motivated by the requirement of maintaining causal coherence (the UPC limit \(\kappa_{\text{crit}} \sim 10^{-78}\)): weak signals are more susceptible to the underlying quantum fluctuations of spacetime.
+
+Mathematically, we model the received signal \(s_{\text{out}}(t)\) as
+\begin{equation}
+s_{\text{out}}(t) = \operatorname{Re}\left\{ A(t) e^{i[\phi(t) + \eta(t)]} \right\},
+\end{equation}
+where \(A(t)\) and \(\phi(t)\) are the original amplitude and phase, and \(\eta(t)\) is a zero-mean Gaussian noise term with standard deviation
+\begin{equation}
+\sigma_\eta(t) = \frac{\sigma_0}{|A(t)| + \epsilon},
+\end{equation}
+with \(\sigma_0\) a free parameter controlling the strength of the jitter and \(\epsilon\) a small regularization constant.
+
+\subsection{The Filter Effect}
+Strong, regular signals (pulsars) have large \(|A(t)|\) and thus experience very little phase jitter. Their periodic structure remains intact, allowing them to be detected even after traversing cosmological distances. Weak, modulated artificial signals, on the other hand, have small \(|A(t)|\) and are strongly perturbed by \(\eta(t)\). The information they carry is scrambled beyond recovery. This acts as a natural ``low-pass'' filter on the complexity of signals that can propagate across interstellar space: only the simplest, most powerful beacons survive.
+
+\section{Numerical Simulation}
+To illustrate the concept, we simulate two types of signals: a weak BPSK transmission (representing an artificial communication) and a strong periodic pulse train (representing a natural pulsar). Both are subjected to the same phase jitter model with increasing strength \(\sigma_0\).
+
+\subsection{Signal Generation}
+\begin{itemize}
+    \item \textbf{Artificial signal}: A 12-bit BPSK sequence with a carrier frequency of 10 Hz, amplitude 0.3 (arbitrary units), plus baseline white noise of standard deviation 0.1.
+    \item \textbf{Pulsar-like signal}: A train of short pulses with period 0.2 s, amplitude 5.0, and the same baseline noise.
+\end{itemize}
+
+\subsection{Phase Jitter Application}
+The phase jitter is applied using the model of Eq.~(2)--(3). Three values of \(\sigma_0\) are tested: 0.0 (no jitter), 0.2, and 0.5.
+
+\section{Results}
+Figure~\ref{fig:filter} shows the output of the simulation. In the absence of jitter (\(\sigma_0 = 0\)), both signals are clearly identifiable. As \(\sigma_0\) increases, the artificial signal rapidly loses its modulation pattern and becomes indistinguishable from noise. The pulsar signal, while somewhat distorted, retains its periodic structure and a high signal-to-noise ratio (SNR $\approx 4.5$ at the highest jitter level).
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.95\textwidth]{filtro_fase_gravitacional.png}
+\caption{Effect of the phase jitter on a weak artificial signal (left column) and a strong pulsar-like signal (right column). From top to bottom: \(\sigma_0 = 0.0\), \(0.2\), and \(0.5\). The artificial signal becomes noise, while the pulsar remains detectable.}
+\label{fig:filter}
+\end{figure}
+
+\section{Discussion}
+The simulation demonstrates the core idea of the Gravitational Phase Filter: a small amount of stochastic phase noise can effectively erase complex, weak signals while preserving strong, simple ones. If such a mechanism operates in the real universe —either through classical gravitational desynchronization or through a quantum jitter of the type postulated by UAT/UCP— it would have profound implications for SETI.
+
+\begin{enumerate}
+    \item \textbf{Detectability threshold}: Only signals whose intrinsic amplitude exceeds a certain threshold (relative to the jitter strength) can cross interstellar distances with their information intact. This would naturally explain why we observe pulsars but no artificial transmissions, even if civilizations are common.
+    \item \textbf{Galactic habitability}: The filter would be stronger in regions with deeper gravitational potential wells or higher space-time “turbulence”, adding another factor to the already stringent requirements for life and communication.
+    \item \textbf{Connection to the Hubble tension}: The same quantum braking parameter \(k_{\text{early}}\) that modifies the early expansion rate also determines the characteristic scale of the phase jitter, linking the Fermi paradox to cosmological observations.
+\end{enumerate}
+
+We stress the speculative nature of this work. The phase jitter model used here is a phenomenological ansatz inspired by UAT/UCP; it does not derive from a rigorous quantum gravity calculation. However, the underlying physical idea —that spacetime is not a perfectly transparent medium for coherent signals— deserves further theoretical and observational investigation.
+
+\section{Conclusion}
+We have introduced the concept of a \textit{Gravitational Phase Filter}: a natural mechanism by which weak, information-rich signals are degraded by temporal desynchronization, while strong, periodic signals survive. The numerical simulation illustrates the effect, and we have discussed its potential relevance to the Fermi paradox. The framework links the problem of interstellar communication to the fundamental structure of spacetime as described by the UAT and UCP principles.
+
+This document is an exploratory essay, not a formal scientific paper. Its purpose is to stimulate discussion and to place a new idea in the public domain. The complete simulation code is available on Zenodo along with this manuscript.
+
+\begin{thebibliography}{9}
+\bibitem{UAT} M.~A.~Percudani, \emph{Universal Applied Time (UAT) Framework}, Zenodo, 2024. DOI: \texttt{10.5281/zenodo.17729221}
+\bibitem{UCP} M.~A.~Percudani, \emph{Unified Causal Principle (UCP)}, Zenodo, 2024. DOI: \texttt{10.5281/zenodo.17718670}
+\bibitem{fermi} M.~H.~Hart, \emph{An Explanation for the Absence of Extraterrestrials on Earth}, QJRAS, 16, 128 (1975).
+\bibitem{tipler} F.~J.~Tipler, \emph{Extraterrestrial intelligent beings do not exist}, QJRAS, 21, 267 (1980).
+\end{thebibliography}
+
+\end{document}

@@ -1,0 +1,282 @@
+ ===========================================================================
+PERCUDANI AUTHORSHIP - Embudo Termodinámico (γ = 2.08 fijo)
+===========================================================================
+  Run 20/100 completado
+  Run 40/100 completado
+  Run 60/100 completado
+  Run 80/100 completado
+  Run 100/100 completado
+
+--- VALIDACIÓN FINAL (γ = 2.08) ---
+SVR medio: 0.046885
+Desviación estándar: 0.002960
+Error estándar de la media: 0.000296
+Intervalo de confianza 95%: [0.046304, 0.047465]
+SVR objetivo: 0.047589
+Diferencia media - objetivo: -0.000704
+
+⚠ La media difiere del objetivo más allá del intervalo de confianza.
+
+
+
+
+
+
+
+
+
+
+
+
+
+===========================================================================
+PERCUDANI AUTHORSHIP - VASCO-LIGO Correlator v2.0 (Tolerante a fallos)
+===========================================================================
+
+Procesando VASCO-01 (RA=99.0875°, Dec=2.4339°)...
+  Intento 1 en GPS 1377960018 fallido, probando +1 día...
+  Intento 2 en GPS 1378046418 fallido, probando +1 día...
+  Segmento encontrado en GPS 1378132818 (intento 3)
+  SVR H1: 0.046038 | SVR L1: 0.044665 | Coh máx: 0.0718 | Sing: 0
+
+Procesando VASCO-02 (RA=296.3001°, Dec=-14.1758°)...
+  Intento 1 en GPS 1376844018 fallido, probando +1 día...
+  Segmento encontrado en GPS 1376930418 (intento 2)
+  SVR H1: 0.044824 | SVR L1: 0.047951 | Coh máx: 0.1064 | Sing: 0
+
+Procesando VASCO-03 (RA=14.5621°, Dec=45.8992°)...
+  Intento 1 en GPS 1378456818 fallido, probando +1 día...
+  Segmento encontrado en GPS 1378543218 (intento 2)
+  SVR H1: 0.049227 | SVR L1: 0.045221 | Coh máx: 0.0165 | Sing: 0
+
+Procesando VASCO-04 (RA=134.1120°, Dec=-8.4410°)...
+  Segmento encontrado en GPS 1378399218 (intento 1)
+  SVR H1: 0.043251 | SVR L1: 0.044131 | Coh máx: 0.0446 | Sing: 0
+
+Procesando VASCO-05 (RA=210.5543°, Dec=33.1095°)...
+  Segmento encontrado en GPS 1382467218 (intento 1)
+  SVR H1: 0.047422 | SVR L1: 0.044497 | Coh máx: 0.0492 | Sing: 0
+
+Procesando VASCO-06 (RA=55.7892°, Dec=-22.5034°)...
+  Segmento encontrado en GPS 1379414418 (intento 1)
+  SVR H1: 0.048572 | SVR L1: 0.040619 | Coh máx: 0.0501 | Sing: 0
+
+Procesando VASCO-07 (RA=315.0045°, Dec=60.1128°)...
+  Intento 1 en GPS 1369266018 fallido, probando +1 día...
+  Intento 2 en GPS 1369352418 fallido, probando +1 día...
+  Segmento encontrado en GPS 1369438818 (intento 3)
+  SVR H1: 0.045211 | SVR L1: 0.046771 | Coh máx: 0.0478 | Sing: 0
+
+Procesando VASCO-08 (RA=88.3412°, Dec=15.7761°)...
+  Segmento encontrado en GPS 1379637618 (intento 1)
+  SVR H1: 0.045185 | SVR L1: 0.046572 | Coh máx: 0.0335 | Sing: 0
+
+Procesando VASCO-09 (RA=275.9088°, Dec=-5.3341°)...
+  Segmento encontrado en GPS 1380328818 (intento 1)
+  SVR H1: 0.045788 | SVR L1: 0.044497 | Coh máx: 0.0408 | Sing: 0
+
+Procesando VASCO-10 (RA=102.4456°, Dec=48.2010°)...
+  Intento 1 en GPS 1380890418 fallido, probando +1 día...
+  Segmento encontrado en GPS 1380976818 (intento 2)
+  SVR H1: 0.050868 | SVR L1: 0.044639 | Coh máx: 0.0638 | Sing: 0
+
+===========================================================================
+RESUMEN DE CORRELACIÓN VASCO-LIGO
+===========================================================================
+SVR objetivo teórico: 0.047589
+γ fijo: 2.08
+
+VASCO-01: SVR H1=0.046038 (✓ Normal) | SVR L1=0.044665 (✓ Normal) | Coh=0.0718
+VASCO-02: SVR H1=0.044824 (✓ Normal) | SVR L1=0.047951 (✓ Normal) | Coh=0.1064
+VASCO-03: SVR H1=0.049227 (✓ Normal) | SVR L1=0.045221 (✓ Normal) | Coh=0.0165
+VASCO-04: SVR H1=0.043251 (✓ Normal) | SVR L1=0.044131 (✓ Normal) | Coh=0.0446
+VASCO-05: SVR H1=0.047422 (✓ Normal) | SVR L1=0.044497 (✓ Normal) | Coh=0.0492
+VASCO-06: SVR H1=0.048572 (✓ Normal) | SVR L1=0.040619 (⬆ ANOMALÍA) | Coh=0.0501
+VASCO-07: SVR H1=0.045211 (✓ Normal) | SVR L1=0.046771 (✓ Normal) | Coh=0.0478
+VASCO-08: SVR H1=0.045185 (✓ Normal) | SVR L1=0.046572 (✓ Normal) | Coh=0.0335
+VASCO-09: SVR H1=0.045788 (✓ Normal) | SVR L1=0.044497 (✓ Normal) | Coh=0.0408
+VASCO-10: SVR H1=0.050868 (✓ Normal) | SVR L1=0.044639 (✓ Normal) | Coh=0.0638
+
+0/10 candidatos muestran SVR anómala en H1.
+1/10 candidatos muestran SVR anómala en L1.
+===========================================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ===========================================================================
+PERCUDANI AUTHORSHIP - Resonant Hunter v9.1 (VASCO-02)
+DOI RH: 10.5281/zenodo.18446712 | DOI UAT: 10.5281/zenodo.17729221 | DOI UPC: 10.5281/zenodo.18210808
+===========================================================================
+Descargando L1 en GPS 1376930418...
+
+--- MÉTRICAS FINALES ---
+Coherencia máxima en banda Higo: 0.1064
+Singularidades restauradas: 0
+SVR L1 (embudo γ=2.08): 0.048564 (objetivo 0.047571)
+σ_TVI (L1): 1.2003
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ===========================================================================
+PERCUDANI AUTHORSHIP - Resonant Hunter v9.1 (VASCO-06)
+DOI RH: 10.5281/zenodo.18446712 | DOI UAT: 10.5281/zenodo.17729221 | DOI UPC: 10.5281/zenodo.18210808
+===========================================================================
+Descargando L1 en GPS 1379414418...
+
+--- MÉTRICAS FINALES ---
+Coherencia máxima en banda Higo: 0.0501
+Singularidades restauradas: 0
+SVR L1 (embudo γ=2.08): 0.047086 (objetivo 0.047571)
+σ_TVI (L1): 1.5200
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ===========================================================================
+PERCUDANI AUTHORSHIP – Espectro Blanco Final (VASCO‑02)
+DOI RH: 10.5281/zenodo.18446712 | DOI UAT: 10.5281/zenodo.17729221 | DOI UPC: 10.5281/zenodo.18210808
+===========================================================================
+Descargando L1 en GPS 1376930418...
+
+--- VERIFICACIÓN DEL PICO UAT ---
+Frecuencia objetivo: 187.37 Hz
+Frecuencia del pico más cercano: 187.38 Hz
+Amplitud normalizada: 0.0001
+¿Es una línea instrumental? Probablemente NO
+===========================================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+===========================================================================
+PERCUDANI AUTHORSHIP – Catálogo UAT-VASCO (10 candidatos)
+DOI RH: 10.5281/zenodo.18446712 | DOI UAT: 10.5281/zenodo.17729221 | DOI UPC: 10.5281/zenodo.18210808
+===========================================================================
+
+Procesando VASCO-01 (RA=99.0875°, Dec=2.4339°)...
+  Intento 1 fallido, probando +1 día...
+  Segmento GPS 1378046418 (intento 2)
+  Coh=1.0000 | SVR=nan | TVI_std=nan | Amp_187=nan
+
+Procesando VASCO-02 (RA=296.3001°, Dec=-14.1758°)...
+  Intento 1 fallido, probando +1 día...
+  Segmento GPS 1376930418 (intento 2)
+  Coh=0.1064 | SVR=0.048150 | TVI_std=1.1892 | Amp_187=0.0001
+
+Procesando VASCO-03 (RA=14.5621°, Dec=45.8992°)...
+  Intento 1 fallido, probando +1 día...
+  Segmento GPS 1378543218 (intento 2)
+  Coh=0.0165 | SVR=0.044131 | TVI_std=1.3967 | Amp_187=0.0001
+
+Procesando VASCO-04 (RA=134.1120°, Dec=-8.4410°)...
+  Segmento GPS 1378399218 (intento 1)
+  Coh=0.0446 | SVR=0.048214 | TVI_std=1.3893 | Amp_187=0.0000
+
+Procesando VASCO-05 (RA=210.5543°, Dec=33.1095°)...
+  Segmento GPS 1382467218 (intento 1)
+  Coh=0.0492 | SVR=0.044026 | TVI_std=1.9129 | Amp_187=0.0000
+
+Procesando VASCO-06 (RA=55.7892°, Dec=-22.5034°)...
+  Segmento GPS 1379414418 (intento 1)
+  Coh=0.0501 | SVR=0.047221 | TVI_std=1.5200 | Amp_187=0.0002
+
+Procesando VASCO-07 (RA=315.0045°, Dec=60.1128°)...
+  Intento 1 fallido, probando +1 día...
+  Intento 2 fallido, probando +1 día...
+  Segmento GPS 1369438818 (intento 3)
+  Coh=0.0478 | SVR=0.051072 | TVI_std=0.2138 | Amp_187=0.0002
+
+Procesando VASCO-08 (RA=88.3412°, Dec=15.7761°)...
+  Segmento GPS 1379637618 (intento 1)
+  Coh=0.0335 | SVR=0.045513 | TVI_std=1.5487 | Amp_187=0.0001
+
+Procesando VASCO-09 (RA=275.9088°, Dec=-5.3341°)...
+  Segmento GPS 1380328818 (intento 1)
+  Coh=0.0408 | SVR=0.047363 | TVI_std=1.6377 | Amp_187=0.0001
+
+Procesando VASCO-10 (RA=102.4456°, Dec=48.2010°)...
+  Intento 1 fallido, probando +1 día...
+  Segmento GPS 1380976818 (intento 2)
+  Coh=0.0638 | SVR=0.047282 | TVI_std=1.7100 | Amp_187=0.0001
+
+==========================================================================================
+CATÁLOGO UAT-VASCO (Resonant Hunter v9.1)
+SVR objetivo teórico: 0.047571
+ID                 RA      Dec   Coh_max    SVR_L1   TVI_std   Amp_187
+------------------------------------------------------------------------------------------
+VASCO-01       99.088    2.434    1.0000       nan       nan       nan
+VASCO-02      296.300  -14.176    0.1064  0.048150    1.1892    0.0001
+VASCO-03       14.562   45.899    0.0165  0.044131    1.3967    0.0001
+VASCO-04      134.112   -8.441    0.0446  0.048214    1.3893    0.0000
+VASCO-05      210.554   33.109    0.0492  0.044026    1.9129    0.0000
+VASCO-06       55.789  -22.503    0.0501  0.047221    1.5200    0.0002
+VASCO-07      315.005   60.113    0.0478  0.051072    0.2138    0.0002
+VASCO-08       88.341   15.776    0.0335  0.045513    1.5487    0.0001
+VASCO-09      275.909   -5.334    0.0408  0.047363    1.6377    0.0001
+VASCO-10      102.446   48.201    0.0638  0.047282    1.7100    0.0001
+==========================================================================================
+
+
+
